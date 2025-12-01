@@ -1,0 +1,4 @@
+low_ctr_threshold: 0.01
+low_roas_threshold: 1.5
+min_impressions: 1000
+random_seed: 42
