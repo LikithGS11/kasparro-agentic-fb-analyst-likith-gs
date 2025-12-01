@@ -1,5 +1,135 @@
 # Kasparro Agentic Facebook Performance Analyst
 
+Overview
+--------
+Kasparro is an agentic pipeline that analyzes Facebook advertising data to detect campaign-level performance issues, generate evidence-backed hypotheses, validate them numerically, and produce creative recommendations and a concise report.
+
+Features
+--------
+- Detect campaign ROAS and CTR declines
+- Produce hypotheses with quantified evidence and confidence
+- Generate campaign-specific creative recommendations
+- Export human-readable reports and structured JSON for automation
+
+System Architecture
+-------------------
+The pipeline is sequential and deterministic:
+
+Planner → Data Agent → Insight Agent → Evaluator → Creative Agent → Orchestrator
+
+- Planner decomposes queries into steps
+- Agents exchange compact summaries
+- Orchestrator logs each step and compiles outputs
+
+Agent Responsibilities
+----------------------
+- Planner: translate user query to a step sequence
+- Data Agent: load, clean, aggregate, and detect metric drops
+- Insight Agent: produce hypotheses with supporting evidence
+- Evaluator: validate hypotheses and adjust confidence
+- Creative Agent: recommend headlines, messages, and CTAs for low-CTR campaigns
+
+Installation
+------------
+Prerequisites: Python 3.10+ and a virtual environment.
+
+```bash
+# create and activate venv
+python -m venv venv
+# Windows
+venv\Scripts\activate
+# macOS / Linux
+source venv/bin/activate
+
+# install dependencies
+pip install -r requirements.txt
+```
+
+Usage
+-----
+Run the pipeline with a natural-language query:
+
+```bash
+python src/orchestrator/run.py "Analyze ROAS drop in last 7 days"
+```
+
+Windows helper:
+
+```bat
+run.bat run "Analyze ROAS drop"
+```
+
+Data Format
+-----------
+Place a CSV in `data/` with (order not strict):
+
+```
+campaign_name,adset_name,date,spend,impressions,clicks,ctr,purchases,revenue,roas,creative_type,creative_message,audience_type,platform,country
+```
+
+Configuration
+-------------
+Edit `config/config.yaml` to tune thresholds:
+
+```yaml
+low_ctr_threshold: 0.01
+low_roas_threshold: 1.5
+min_impressions: 1000
+random_seed: 42
+```
+
+Outputs
+-------
+- `reports/report.md` — human-readable analysis
+- `reports/insights.json` — structured insights and hypotheses
+- `reports/creatives.json` — creative recommendations
+- `logs/` — timestamped per-step JSON traces
+
+Project Structure
+-----------------
+
+```
+src/
+  agents/
+  orchestrator/
+  utils/
+prompts/
+data/
+config/
+reports/
+logs/
+tests/
+```
+
+Validation Logic
+----------------
+- Threshold-driven rules (configurable)
+- Confidence adjustments: +0.2 (large drop >20%), +0.1 (moderate 10–20%), -0.1 for weak evidence
+- Confidence clamped to [0.0, 1.0]
+
+Testing
+-------
+Run unit tests with pytest:
+
+```bash
+python -m pytest tests/ -v
+```
+
+Troubleshooting
+---------------
+- `ModuleNotFoundError: No module named 'pandas'` — activate venv and run `pip install -r requirements.txt`
+- Missing CSV — ensure file placed in `data/` and path in config is correct
+- If `run.bat` fails, run the Python command directly
+
+Author & License
+----------------
+Created for the Applied AI Engineer assignment. Contact the author for license details.
+
+---
+
+This README focuses on essential information required for evaluation and reproducible execution.
+# Kasparro Agentic Facebook Performance Analyst
+
 A sophisticated agentic system for analyzing Facebook ad performance using AI-driven agents that collaborate through a deterministic pipeline to generate insights and creative recommendations.
 
 ## 🎯 Overview
