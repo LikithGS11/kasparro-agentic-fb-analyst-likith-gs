@@ -205,7 +205,12 @@ def main(user_query, enable_drift_detection=True):
     logger.info("-" * 70)
     
     planner = PlannerAgent(log_reasoning=True)
+    # Trace planner execution
+    planner_tracer = AgentExecutionTracer("PlannerAgent")
+    planner_tracer.start("plan", {"query": user_query})
     plan = safe_plan(planner, user_query)
+    planner_tracer.end(plan, error=None)
+    planner_tracer.save_traces(run_id)
     logger.info(f"Generated plan with {len(plan.get('steps', []))} steps")
     
     if "complexity_analysis" in plan:
@@ -217,7 +222,12 @@ def main(user_query, enable_drift_detection=True):
     logger.info("-" * 70)
     
     data_agent = DataAgent(DATA_PATH)
+    # Trace data loading and summarization
+    data_tracer = AgentExecutionTracer("DataAgent")
+    data_tracer.start("load_and_summarize", {"path": DATA_PATH})
     summary = safe_load_and_summarize(data_agent)
+    data_tracer.end(summary, error=None)
+    data_tracer.save_traces(run_id)
     logger.info(f"Loaded {len(summary.get('campaigns', []))} campaigns")
     logger.info(f"Date range: {summary.get('date_range', 'N/A')}")
     logger.info(f"ROAS drop campaigns: {len(summary.get('top_drops', {}).get('roas_drop_campaigns', []))}")
@@ -241,7 +251,12 @@ def main(user_query, enable_drift_detection=True):
     logger.info("-" * 70)
     
     insight_agent = InsightAgent()
+    # Trace insight generation
+    insight_tracer = AgentExecutionTracer("InsightAgent")
+    insight_tracer.start("generate", {"campaigns": len(summary.get('campaigns', []))})
     insights = safe_generate_insights(insight_agent, summary)
+    insight_tracer.end(insights, error=None)
+    insight_tracer.save_traces(run_id)
     logger.info(f"Generated {len(insights.get('insights', []))} insights")
     
     for idx, insight in enumerate(insights.get('insights', [])):
@@ -254,7 +269,12 @@ def main(user_query, enable_drift_detection=True):
     logger.info("-" * 70)
     
     evaluator = EvaluatorAgent()
+    # Trace evaluation
+    eval_tracer = AgentExecutionTracer("EvaluatorAgent")
+    eval_tracer.start("validate", {"insights_count": len(insights.get('insights', []))})
     validated = safe_validate_insights(evaluator, insights, summary)
+    eval_tracer.end(validated, error=None)
+    eval_tracer.save_traces(run_id)
     logger.info(f"Validated {len(validated.get('validated', []))} insights")
     
     high_conf_count = sum(1 for v in validated.get('validated', []) if v.get('confidence', 0) > 0.7)
@@ -266,7 +286,12 @@ def main(user_query, enable_drift_detection=True):
     
     creative_agent = CreativeAgent()
     df = data_agent.df if hasattr(data_agent, 'df') else None
+    # Trace creative generation
+    creative_tracer = AgentExecutionTracer("CreativeAgent")
+    creative_tracer.start("generate", {"campaigns": len(summary.get('campaigns', []))})
     creatives = safe_generate_creatives(creative_agent, df, summary)
+    creative_tracer.end(creatives, error=None)
+    creative_tracer.save_traces(run_id)
     logger.info(f"Generated {len(creatives.get('creatives', []))} creative sets")
     
     # ===== STEP 6: OUTPUT PERSISTENCE & VALIDATION =====
