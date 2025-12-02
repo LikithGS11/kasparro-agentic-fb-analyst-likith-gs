@@ -1,5 +1,10 @@
 import random
 import json
+import logging
+from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
+
 
 class CreativeAgent:
     """Generates creative recommendations for campaigns with low CTR."""
@@ -42,4 +47,15 @@ class CreativeAgent:
 
 if __name__ == '__main__':
     ca = CreativeAgent()
-    print(json.dumps(ca.generate(summary={"top_drops":{"ctr_drop_campaigns":[{"campaign":"SummerSale","change":-0.25}]}}), indent=2))
+    sample_summary = {
+        "top_drops": {
+            "ctr_drop_campaigns": [
+                {"campaign": "Summer Sale", "change": -0.25}
+            ],
+            "roas_drop_campaigns": [
+                {"campaign": "Premium Tier", "change": -0.15}
+            ]
+        }
+    }
+    result = ca.generate(summary=sample_summary)
+    print(json.dumps(result, indent=2))
