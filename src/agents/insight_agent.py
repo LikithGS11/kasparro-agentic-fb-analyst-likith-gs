@@ -166,6 +166,51 @@ class InsightAgent:
         
         return max(self.min_confidence, min(self.max_confidence, base_confidence))
 
+    def _diagnose_root_cause(self, item: Dict[str, Any], metric_type: str) -> str:
+        """
+        Diagnose root cause of performance drop using heuristic rules.
+        
+        Args:
+            item: Campaign drop data with metrics
+            metric_type: 'roas' or 'ctr'
+        
+        Returns:
+            Diagnosis string explaining likely root cause
+        """
+        diagnosis = []
+        
+        if metric_type == 'roas':
+            # ROAS diagnosis
+            relative_delta = item.get('relative_delta', 0)
+            spend = item.get('spend', 0)
+            
+            if relative_delta < -0.4:
+                diagnosis.append("severe_performance_degradation")
+            elif relative_delta < -0.2:
+                diagnosis.append("moderate_performance_decline")
+            
+            if spend > 5000:
+                diagnosis.append("high_spend_inefficiency")
+        
+        elif metric_type == 'ctr':
+            # CTR diagnosis with fatigue/saturation signals
+            relative_delta = item.get('relative_delta', 0)
+            impressions_change = item.get('impressions_change', 0)
+            
+            # Creative fatigue: CTR down, impressions flat/up
+            if relative_delta < -0.15 and impressions_change > -0.05:
+                diagnosis.append("creative_fatigue")
+            
+            # Audience saturation: CTR down, impressions down
+            elif relative_delta < -0.15 and impressions_change < -0.1:
+                diagnosis.append("audience_saturation")
+            
+            # General CTR decline
+            else:
+                diagnosis.append("engagement_decline")
+        
+        return " | ".join(diagnosis) if diagnosis else "performance_variance"
+
     def generate(self, summary: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate insights from data summary with V2 enhancements.
@@ -177,6 +222,7 @@ class InsightAgent:
             Dict with insights list (schema v2.0)
         """
         insights = []
+        decision_logs = []
         
         try:
             drops = summary.get('top_drops', {})
@@ -184,7 +230,7 @@ class InsightAgent:
             # Extract and filter ROAS drops
             roas_drops = drops.get('roas_drop_campaigns', [])
             if roas_drops:
-                roas_changes = [item['change'] for item in roas_drops if item.get('change') is not None]
+                roas_changes = [item.get('relative_delta', item.get('change')) for item in roas_drops if item.get('relative_delta') or item.get('change')]
                 filtered_roas, roas_outliers = self._detect_outliers(roas_changes)
                 roas_threshold = self._compute_adaptive_threshold(filtered_roas)
                 
@@ -195,28 +241,50 @@ class InsightAgent:
                 
                 for item in roas_drops:
                     camp = item['campaign']
-                    change = item['change']
+                    change = item.get('relative_delta', item.get('change'))
+                    baseline = item.get('baseline_value', 0)
+                    current = item.get('current_value', 0)
+                    absolute_delta = item.get('absolute_delta', current - baseline)
                     
                     if change is None or change >= -roas_threshold:
                         continue  # Not significant
                     
-                    # Generalized hypothesis (avoid dataset-specific language)
+                    # Root cause diagnosis
+                    diagnosis = self._diagnose_root_cause(item, 'roas')
+                    
+                    # Calculate confidence
                     confidence = self._calculate_confidence(
                         change,
                         roas_threshold,
                         is_outlier_removed=(roas_outliers > 0)
                     )
                     
+                    # Decision log
+                    decision_logs.append({
+                        "campaign": camp,
+                        "metric": "ROAS",
+                        "trigger": f"Relative drop {change:.2%} exceeds threshold {roas_threshold:.2%}",
+                        "diagnosis": diagnosis,
+                        "confidence_reasoning": f"Magnitude {abs(change):.2f} relative to threshold",
+                        "baseline": baseline,
+                        "current": current
+                    })
+                    
+                    logger.info(f"Insight generated: {camp} ROAS drop {change:.2%}, diagnosis={diagnosis}")
+                    
                     insights.append({
                         "hypothesis": (
-                            f"Campaign '{camp}' shows decreased return on ad spend. "
-                            "This may reflect changes in audience targeting, bid strategies, "
-                            "or competitive dynamics."
+                            f"Campaign '{camp}' shows decreased return on ad spend "
+                            f"(ROAS dropped from {baseline:.2f} to {current:.2f}). "
+                            f"Root cause: {diagnosis.replace('_', ' ')}."
                         ),
                         "evidence": {
                             "campaign": camp,
-                            "roas_change": change,
-                            "change_percentile": f"{abs(change)*100:.1f}%"
+                            "baseline_value": baseline,
+                            "current_value": current,
+                            "absolute_delta": absolute_delta,
+                            "relative_delta": change,
+                            "diagnosis": diagnosis
                         },
                         "expected_impact": "Moderate to High",
                         "confidence": round(confidence, 2),
@@ -228,7 +296,7 @@ class InsightAgent:
             # Extract and filter CTR drops
             ctr_drops = drops.get('ctr_drop_campaigns', [])
             if ctr_drops:
-                ctr_changes = [item['change'] for item in ctr_drops if item.get('change') is not None]
+                ctr_changes = [item.get('relative_delta', item.get('change')) for item in ctr_drops if item.get('relative_delta') or item.get('change')]
                 filtered_ctr, ctr_outliers = self._detect_outliers(ctr_changes)
                 ctr_threshold = self._compute_adaptive_threshold(filtered_ctr)
                 
@@ -239,10 +307,29 @@ class InsightAgent:
                 
                 for item in ctr_drops:
                     camp = item['campaign']
-                    change = item['change']
+                    change = item.get('relative_delta', item.get('change'))
+                    baseline = item.get('baseline_value', 0)
+                    current = item.get('current_value', 0)
+                    absolute_delta = item.get('absolute_delta', current - baseline)
                     
                     if change is None or change >= -ctr_threshold:
                         continue  # Not significant
+                    
+                    # Root cause diagnosis
+                    diagnosis = self._diagnose_root_cause(item, 'ctr')
+                    
+                    # Decision log
+                    decision_logs.append({
+                        "campaign": camp,
+                        "metric": "CTR",
+                        "trigger": f"Relative drop {change:.2%} exceeds threshold {ctr_threshold:.2%}",
+                        "diagnosis": diagnosis,
+                        "impressions_signal": f"Change: {item.get('impressions_change', 0):.2%}",
+                        "baseline": baseline,
+                        "current": current
+                    })
+                    
+                    logger.info(f"Insight generated: {camp} CTR drop {change:.2%}, diagnosis={diagnosis}")
                     
                     confidence = self._calculate_confidence(
                         change,
@@ -252,14 +339,18 @@ class InsightAgent:
                     
                     insights.append({
                         "hypothesis": (
-                            f"Campaign '{camp}' shows declining click-through rate. "
-                            "This suggests potential fatigue in ad creative, messaging misalignment, "
-                            "or audience saturation."
+                            f"Campaign '{camp}' shows declining click-through rate "
+                            f"(CTR dropped from {baseline:.4f} to {current:.4f}). "
+                            f"Root cause: {diagnosis.replace('_', ' ')}."
                         ),
                         "evidence": {
                             "campaign": camp,
-                            "ctr_change": change,
-                            "change_percentile": f"{abs(change)*100:.1f}%"
+                            "baseline_value": baseline,
+                            "current_value": current,
+                            "absolute_delta": absolute_delta,
+                            "relative_delta": change,
+                            "diagnosis": diagnosis,
+                            "impressions_signal": item.get('impressions_change', 0)
                         },
                         "expected_impact": "High on engagement",
                         "confidence": round(confidence, 2),
@@ -278,6 +369,11 @@ class InsightAgent:
                     ),
                     "evidence": {
                         "campaigns_analyzed": len(summary.get('campaigns', [])),
+                        "baseline_value": 0,
+                        "current_value": 0,
+                        "absolute_delta": 0,
+                        "relative_delta": 0,
+                        "diagnosis": "stable_performance",
                         "note": "Stable performance period"
                     },
                     "expected_impact": "Uncertain",
@@ -291,7 +387,14 @@ class InsightAgent:
             logger.error(f"Error generating insights: {e}")
             insights.append({
                 "hypothesis": "Unable to generate insights due to processing error.",
-                "evidence": {"error": str(e)},
+                "evidence": {
+                    "error": str(e),
+                    "baseline_value": 0,
+                    "current_value": 0,
+                    "absolute_delta": 0,
+                    "relative_delta": 0,
+                    "diagnosis": "error"
+                },
                 "expected_impact": "Unknown",
                 "confidence": 0.0,
                 "confidence_level": "low",
@@ -299,7 +402,10 @@ class InsightAgent:
                 "schema_version": "2.0"
             })
         
-        return {"insights": insights, "schema_version": "2.0"}
+        # Store decision logs for observability
+        self.decision_logs = decision_logs
+        
+        return {"insights": insights, "decision_logs": decision_logs, "schema_version": "2.0"}
 
 
 if __name__ == '__main__':

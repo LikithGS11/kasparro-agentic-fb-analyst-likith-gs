@@ -259,6 +259,13 @@ def main(user_query, enable_drift_detection=True):
     insight_tracer.save_traces(run_id)
     logger.info(f"Generated {len(insights.get('insights', []))} insights")
     
+    # Save decision logs for observability
+    decision_logs = insights.get('decision_logs', [])
+    if decision_logs:
+        decision_log_path = f"logs/{run_id}_decision_logs.json"
+        save_json(decision_logs, decision_log_path)
+        logger.info(f"✓ Saved decision logs to {decision_log_path}")
+    
     for idx, insight in enumerate(insights.get('insights', [])):
         conf = insight.get('confidence', insight.get('confidence_estimate', 0))
         conf_level = insight.get('confidence_level', 'unknown')
@@ -289,7 +296,8 @@ def main(user_query, enable_drift_detection=True):
     # Trace creative generation
     creative_tracer = AgentExecutionTracer("CreativeAgent")
     creative_tracer.start("generate", {"campaigns": len(summary.get('campaigns', []))})
-    creatives = safe_generate_creatives(creative_agent, df, summary)
+    # Pass insights so CreativeAgent can use diagnoses
+    creatives = creative_agent.generate(df=df, summary=summary, insights=insights)
     creative_tracer.end(creatives, error=None)
     creative_tracer.save_traces(run_id)
     logger.info(f"Generated {len(creatives.get('creatives', []))} creative sets")

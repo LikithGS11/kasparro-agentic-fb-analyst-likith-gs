@@ -1,104 +1,34 @@
 
-# Kasparro Agentic Facebook Performance Analyst
+# Kasparro Agentic Facebook Performance Analyst (V2)
 
-**VERSION 2.0** - Production-Grade Enterprise System
+Production-grade, deterministic pipeline that diagnoses Facebook ad performance drops, validates hypotheses, and ships diagnosis-aware creatives.
 
-A sophisticated agentic system that analyzes Facebook ad performance using AI-driven agents working through a deterministic pipeline. The system identifies performance drops, explains them with data-driven evidence, validates hypotheses, and generates campaign-level creative recommendations.
+## Quickstart (3 commands)
+1) `python -m venv venv && .\venv\Scripts\activate`
+2) `pip install -r requirements.txt`
+3) `python -m src.orchestrator.run "Analyze ROAS drop"`
 
-## 🎯 What's New in V2
+## Architecture (5-7 bullets)
+- PlannerAgent: expands user query into ordered steps with complexity-aware depth.
+- DataAgent: loads CSV, validates schema, computes baseline/current deltas, flags drops.
+- InsightAgent: generates hypotheses with diagnoses, adaptive thresholds, and decision logs.
+- EvaluatorAgent: percentile-based validation, severity scoring, confidence normalization.
+- CreativeAgent: diagnosis-specific creatives aligned to detected drivers.
+- Orchestrator: safe-call retries, schema validation, report generation, structured logs.
 
-V2 adds **production-grade enterprise features** while maintaining 100% backward compatibility:
+## How to modify agents
+- Planner: tune step expansion in `src/agents/planner.py` (complexity thresholds, templates).
+- Data: adjust required columns or delta thresholds in `src/agents/data_agent.py`.
+- Insight: extend diagnosis rules in `_diagnose_root_cause` within `src/agents/insight_agent.py`.
+- Evaluator: tweak percentile and severity logic in `src/agents/evaluator_agent.py`.
+- Creative: update diagnosis templates in `src/agents/creative_agent.py`.
 
-| Feature | Impact |
-|---------|--------|
-| **Error Handling** | Safe calls with retry + exponential backoff. Pipeline never crashes on bad data. |
-| **Division-by-Zero Fix** | Robust `percent_change()` with deterministic fallback behavior. |
-| **Dynamic Planning** | Planner adapts depth based on dataset complexity (campaign count, missing metrics, drops). |
-| **Adaptive Insights** | IQR-based outlier removal + dynamic thresholds + confidence scoring (high/moderate/low). |
-| **Schema v2.0** | Versioned JSON outputs with automatic V1→V2 upgrade and validation. |
-| **Drift Detection** | Compares metrics to baseline, detects anomalies, prevents silent degradation. |
-| **Structured Logging** | Per-agent execution traces, 30-second debugging capability. |
-
-**See [V2_UPGRADE_SUMMARY.md](V2_UPGRADE_SUMMARY.md) for complete details.**
-
-## 🎯 Overview
-
-Kasparro is a multi-agent pipeline designed for automated Facebook ads performance diagnosis. It can:
-
-- Detect ROAS and CTR performance drops  
-- Generate evidence-backed hypotheses  
-- Validate insights with numerical thresholds  
-- Recommend new creatives for underperforming campaigns  
-- Produce complete reports in Markdown and JSON formats  
-
-## 🧩 System Architecture
-
-The pipeline is sequential and deterministic:
-
-```
-User Query
-    ↓
-Planner Agent (V2: Dynamic Complexity) → Breaks query into structured steps
-    ↓
-Data Agent → Loads, cleans data & identifies metric drops
-    ↓
-Insight Agent (V2: Adaptive Thresholds) → Generates hypotheses based on patterns
-    ↓
-Evaluator Agent → Validates hypotheses & scores confidence
-    ↓
-Creative Agent → Produces creative recommendations
-    ↓
-Orchestrator (V2: Safe Calls, Structured Logging) → Compiles final reports & logs
-```
-
-### Agent Responsibilities
-
-| Agent | Role | Output | V2 Enhancement |
-|-------|------|--------|-----------------|
-| **Planner** | Converts natural-language query into actionable steps | Step sequence | Dynamic complexity analysis |
-| **Data Agent** | Loads/aggregates data, detects drops | Dataset summary | Robust error handling |
-| **Insight Agent** | Produces hypotheses + supporting evidence | Hypothesis list | IQR outliers + adaptive confidence |
-| **Evaluator** | Validates hypotheses numerically | Confidence-scored insights | (Unchanged) |
-| **Creative Agent** | Generates ad copy & creative suggestions | Creative JSON | Schema v2.0 compliance |
-| **Orchestrator** | Runs entire pipeline & generates reports | Markdown/JSON/logs | Safe calls + structured logging |
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Python **3.10+**
-- Virtual environment recommended  
-- Facebook Ads CSV dataset in `data/`
-
-### Installation
-
-```bash
-# Clone or extract the project
-cd kasparro-agentic-fb-analyst-likith-gs
-
-# Create & activate venv
-python -m venv venv
-# Windows
-venv\Scripts\activate
-# Mac/Linux
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-## ▶️ Usage
-
-Run the pipeline with a natural-language query:
-
-```bash
-# Standard run (with drift detection)
-python -m src.orchestrator.run "Analyze ROAS drop in last 7 days"
-
-# Fast run (skip drift detection)
-python -m src.orchestrator.run "Analyze ROAS drop" --no-drift
-
-# V2: Check detailed logs for debugging
-tail -f logs/run_*.log
+## Troubleshooting
+- Tests: `python -m pytest -q` (ensure venv active).
+- Missing columns: check input CSV matches required schema in `data_agent.py`.
+- Schema errors: run `SchemaValidator.validate_insights/validate_creatives` in `src/utils/schema_validator.py`.
+- Empty output: confirm `data/` has rows and date ranges; rerun with `--no-drift` to skip drift detector.
+- Logs: inspect `logs/*_decision_logs.json` and agent tracers in `logs/` for step-by-step reasoning.
 ```
 
 Windows batch helper:

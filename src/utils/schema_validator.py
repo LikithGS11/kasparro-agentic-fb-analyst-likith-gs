@@ -25,7 +25,17 @@ INSIGHTS_SCHEMA_V2 = {
                 "required": ["hypothesis", "evidence", "expected_impact", "confidence", "schema_version"],
                 "properties": {
                     "hypothesis": {"type": "string"},
-                    "evidence": {"type": "object"},
+                    "evidence": {
+                        "type": "object",
+                        "required": ["baseline_value", "current_value", "absolute_delta", "relative_delta", "diagnosis"],
+                        "properties": {
+                            "baseline_value": {"type": "number"},
+                            "current_value": {"type": "number"},
+                            "absolute_delta": {"type": "number"},
+                            "relative_delta": {"type": "number"},
+                            "diagnosis": {"type": "string"}
+                        }
+                    },
                     "expected_impact": {"type": "string"},
                     "confidence": {"type": "number", "minimum": 0, "maximum": 1},
                     "confidence_level": {"type": "string", "enum": ["low", "moderate", "high"]},
@@ -46,13 +56,15 @@ CREATIVES_SCHEMA_V2 = {
             "type": "array",
             "items": {
                 "type": "object",
-                "required": ["campaign", "issue", "recommended_headlines", "recommended_messages", "cta", "schema_version"],
+                "required": ["campaign", "issue", "diagnosis", "recommended_headlines", "recommended_messages", "cta", "rationale", "schema_version"],
                 "properties": {
                     "campaign": {"type": ["string", "null"]},
                     "issue": {"type": "string"},
+                    "diagnosis": {"type": "string"},
                     "recommended_headlines": {"type": "array", "items": {"type": "string"}},
                     "recommended_messages": {"type": "array", "items": {"type": "string"}},
                     "cta": {"type": ["string", "null"]},
+                    "rationale": {"type": "string"},
                     "schema_version": {"type": "string", "const": "2.0"}
                 }
             }
